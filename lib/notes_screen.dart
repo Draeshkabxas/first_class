@@ -1,4 +1,6 @@
+import 'package:first_class/provider/NotesProvider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 class NotesScreen extends StatefulWidget {
@@ -9,65 +11,17 @@ class NotesScreen extends StatefulWidget {
 }
 
 class _NotesScreenState extends State<NotesScreen> {
-  List<Map>? _notes;
-  Database? database;
-
-  Future<void> createDatabase() async {
-    // open the database
-    database = await openDatabase("notes.db", version: 1,
-        onCreate: (Database db, int version) async {
-          print("database created!");
-          // When creating the db, create the table
-          await db.execute(
-              'CREATE TABLE Note (id INTEGER PRIMARY KEY, content TEXT)');
-          print("table created!");
-        },
-      onOpen: (database) async {
-        // Get the records
-        _notes = await database.rawQuery('SELECT * FROM Note');
-        print("notes: ${_notes.toString()}");
-        print("database opened!");
-        setState(() {
-
-        });
-      }
-    );
-  }
-
-  Future<void> getNotes() async {
-    _notes = await database?.rawQuery('SELECT * FROM Note');
-    setState(() {
-
-    });
-  }
-
-  Future<void> deleteNote(int id) async {
-    // Delete a record
-    await database
-        ?.rawDelete('DELETE FROM Note WHERE id = $id');
-    getNotes();
-  }
-
-  @override
-  void initState() {
-    createDatabase();
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    database?.close();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
+    NotesProvier watcher=context.watch<NotesProvier>();
+    NotesProvier provider=context.read<NotesProvier>();
     return Scaffold(
       appBar: AppBar(
         title: const Text("Notes"),
         actions: [
           IconButton(onPressed: (){
-            getNotes();
+            watcher.getNotes();
           }, icon: const Icon(Icons.refresh))
         ],
       ),
@@ -82,7 +36,7 @@ class _NotesScreenState extends State<NotesScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      body: _notes == null
+      body: (watcher.notes == null || watcher.notes?.length == 0 )
           ? const Center(
               child: Text(
               "No Notes",
@@ -90,22 +44,43 @@ class _NotesScreenState extends State<NotesScreen> {
             ))
           : ListView.separated(
               itemBuilder: (context, index) => GestureDetector(
-                onTap: (){
-                  int id = _notes?[index]['id'];
-                  deleteNote(id);
-                },
-                child: Card(
-                      shape: const RoundedRectangleBorder(),
-                      child: Text(
-                        _notes?[index]['content'],
-                        style: const TextStyle(fontSize: 32),
+                child: Dismissible(
+                  key: Key("hello"),
+                  background: Container(
+                    color: Colors.red,
+                    child: Align(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 16),
+                        child: Icon(Icons.delete),
                       ),
+                      alignment: Alignment.centerLeft,
                     ),
-              ),
+                  ),
+                    onDismissed: (_) {
+                    provider.deleteNote(watcher.notes?[index]["id"]);
+                      setState(() {
+                      });
+                    },
+                  confirmDismiss: (direction) async {
+                      bool delete = true;
+                      final snackbarController = ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Deleted ${watcher.notes?[index]["content"]}'),
+                          action: SnackBarAction(label: 'Undo', onPressed: () => delete = false),
+                        ),
+                      );
+                      await snackbarController.closed;
+                      return delete;
+                  },
+                  child: ListTile(
+                    title: Text(watcher.notes?[index]["content"]),
+                  ),
+                ),
+                    ),
               separatorBuilder: (context, index) => const SizedBox(
                     height: 16,
                   ),
-              itemCount: _notes!.length),
+              itemCount: watcher.notes!.length),
     );
   }
 }
@@ -120,41 +95,9 @@ class AddNoteScreen extends StatefulWidget {
 class _AddNoteScreenState extends State<AddNoteScreen> {
   var noteController = TextEditingController();
 
-  Database? database;
-
-  Future<void> createDatabase() async {
-    // open the database
-    database = await openDatabase("notes.db", version: 1,
-        onCreate: (Database db, int version) async {
-          print("database created!");
-          // When creating the db, create the table
-          await db.execute(
-              'CREATE TABLE Note (id INTEGER PRIMARY KEY, content TEXT)');
-          print("table created!");
-        },
-        onOpen: (database) {
-          print("database opened!");
-        }
-    );
-  }
-
-  Future<void> insertToDatabase(String note) async {
-    // Insert some records in a transaction
-    await database?.transaction((txn) async {
-      int id1 = await txn.rawInsert(
-          'INSERT INTO Note(content) VALUES("$note")');
-      print('inserted: $id1');
-    });
-  }
-
-  @override
-  void initState() {
-    createDatabase();
-    super.initState();
-  }
-
   @override
   Widget build(BuildContext context) {
+    NotesProvier provider=context.read<NotesProvier>();
     return Scaffold(
       appBar: AppBar(
         title: const Text("Add a note"),
@@ -183,7 +126,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          insertToDatabase(noteController.text);
+          provider.insertToDatabase(noteController.text);
           Navigator.pop(context);
         },
         child: const Icon(Icons.note_add),
