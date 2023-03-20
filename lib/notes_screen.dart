@@ -36,6 +36,7 @@ class _NotesScreenState extends State<NotesScreen> {
         },
         child: const Icon(Icons.add),
       ),
+
       body: (watcher.notes == null || watcher.notes?.length == 0 )
           ? const Center(
               child: Text(
@@ -44,6 +45,14 @@ class _NotesScreenState extends State<NotesScreen> {
             ))
           : ListView.separated(
               itemBuilder: (context, index) => GestureDetector(
+                onTap:(){
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddNoteScreen(id: watcher.notes?[index]["id"],content: watcher.notes?[index]["content"],),
+                    ),
+                  );
+                },
                 child: Dismissible(
                   key: Key("hello"),
                   background: Container(
@@ -56,7 +65,7 @@ class _NotesScreenState extends State<NotesScreen> {
                       alignment: Alignment.centerLeft,
                     ),
                   ),
-                    onDismissed: (_) {
+                    onDismissed: (direction) {
                     provider.deleteNote(watcher.notes?[index]["id"]);
                       setState(() {
                       });
@@ -86,14 +95,27 @@ class _NotesScreenState extends State<NotesScreen> {
 }
 
 class AddNoteScreen extends StatefulWidget {
-  AddNoteScreen({Key? key}) : super(key: key);
+  late int _id;
+  late String _content;
 
+  AddNoteScreen({int id=-1, content= ""}){
+    _id=id;
+    _content = content;
+  }
   @override
-  State<AddNoteScreen> createState() => _AddNoteScreenState();
+  State<AddNoteScreen> createState() => _AddNoteScreenState(id:_id,content: _content);
 }
 
 class _AddNoteScreenState extends State<AddNoteScreen> {
   var noteController = TextEditingController();
+  late int _id;
+
+  late String _content;
+  _AddNoteScreenState({int id = -1, String content = "" }){
+    _id = id;
+    _content = content;
+    noteController.text = content;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +148,11 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          provider.insertToDatabase(noteController.text);
+          if(_id == -1) {
+            provider.insertToDatabase(noteController.text);
+          }else{
+            provider.updateNote(_id,noteController.text);
+          }
           Navigator.pop(context);
         },
         child: const Icon(Icons.note_add),

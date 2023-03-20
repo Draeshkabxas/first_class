@@ -44,6 +44,13 @@ class NotesProvier extends ChangeNotifier{
     getNotes();
   }
 
+  Future<void> updateNote(int id,String content) async {
+    // Delete a record
+    await database
+        ?.rawUpdate('UPDATE Note SET content="$content"  WHERE id = $id');
+    print('updated: $id with content == $content');
+    getNotes();
+  }
 
 
   Future<void> insertToDatabase(String note) async {
